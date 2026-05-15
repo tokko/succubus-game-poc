@@ -15,35 +15,38 @@
 **PIVOT 2026-05-15:** Original plan was built on a false premise — Hunyuan3D 3.0
 does NOT exist on HuggingFace (research agent hallucinated it). Real Tencent state
 caps at the 2-series + new Oct-2025 variants (Omni, Part). Plan pivoted to a
-**3-pipeline bake-off** — same reference image rendered through three local pipelines,
-then evaluated side-by-side in a Unity scene.
+**3-pipeline bake-off**.
 
-**Bake-off pipelines:**
-- **A: Hunyuan3D-2.1 + gen-4 patches** — known-working baseline from `unity-game-poc`
-- **B: Hunyuan3D-Omni** (Oct 2025 variant) — likely incremental improvement on A
-- **C: TRELLIS.2 + AccuRIG 2** — different architecture (structured-latent)
-
-Output: `Assets/Characters/Bakeoff/{A_HY3D21,B_Omni,C_TRELLIS}/*.fbx` and a
-`Bakeoff.unity` scene with all three side-by-side, same anim controller, same
-lighting. Wiki write-up at the end.
+**Bake-off status (2026-05-15):**
+- ✅ **A: Hunyuan3D-2.1** — `Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx`
+  (15.4 MB, 58k verts, Rigify rig with Idle/Walk/Run NLA). Generated from
+  `pipeline/refs/succubus_ref.png` via `gen_a_hy3d21.py` (shape+paint, ~15 min on
+  RTX 3090) then `rig_a_hy3d21.py` (Blender headless Rigify, ~1 min).
+- 🟡 **B: Hunyuan3D-Omni** — DEFERRED. Investigation showed Omni's value comes
+  from control signals (pose/voxel/bbox/point-cloud), not image-only. Running
+  image-only is equivalent to 2.1 in disguise. Proper comparison needs a pose-
+  extraction step (OpenPose / MediaPipe → 3D skeleton joints → Omni's pose
+  control) which is a multi-hour integration. EU-gating did NOT block the
+  download from this account.
+- 🟡 **C: TRELLIS.2 (microsoft/TRELLIS.2-4B)** — DEFERRED. ~25 GB weight pull
+  + ComfyUI node install required. Different architecture (structured-latent)
+  so meaningful only with a real run, not a stub.
 
 **Next session — do this first:**
-Sprint 1 of the bake-off — produce **A: Hunyuan3D-2.1 succubus FBX** in
-`Assets/Characters/Bakeoff/A_HY3D21/`. Copy the working `pipeline/*.py` scripts
-from `unity-game-poc/pipeline/` and adapt output paths to the bake-off subdir.
-Run the full chain: SD Forge txt2img (port 7860 currently up) → HY3D-2.1 shape +
-paint → Blender Rigify + animations → Unity FBX. Most of this is already
-debugged in `unity-game-poc/wiki/characters.md` — re-apply the patches from
-there.
+Open Unity, verify `Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx`
+auto-loads in `GameScene.unity` (the FBX path is now first-priority in
+`SceneAutoSetup.cs`). Expected issue: the Rigify rig uses DEF-bone names that
+don't map to Unity Humanoid muscles — animationType must be **Generic**, not
+Humanoid (per `unity-game-poc/wiki/characters.md`). If Unity tries to import
+as Humanoid by default and Avatar Configurator shows red bones, fix by either
+(a) writing `Assets/Editor/SuccubusImporter.cs` AssetPostprocessor to force
+animationType=Generic on this FBX path, or (b) doing it manually in the
+Inspector and re-saving the .meta.
 
-The HY3D-2.1 weight cache referenced as `E:\hunyuan3d\models` in the old wiki is
-GONE (E: drive empty). Use the HuggingFace cache at
-`C:\Users\andre\.cache\huggingface\hub\models--tencent--Hunyuan3D-2.1` (6.41 GB,
-already cached). `HY3DGEN_MODELS` env var may need to be unset or pointed at HF
-cache root.
-
-Success = `Assets/Characters/Bakeoff/A_HY3D21/succubus_rig_pbr.fbx` exists,
-imports as Humanoid in Unity, plays Idle anim.
+After verification, choose next sprint: either pursue Pipeline B with the
+pose-extraction integration, OR pursue Pipeline C (TRELLIS.2 weight pull +
+ComfyUI integration), OR skip the bake-off and move to Phase 4 (gothic
+painterly look) using Pipeline A as the final character.
 
 **Warnings:**
 - Do NOT delete or modify `unity-game-poc/`. We're cribbing scripts from it.
