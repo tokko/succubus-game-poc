@@ -209,10 +209,12 @@ public static class SetupBakeoffA
     // ── Step 4: AnimatorController (Idle / Walk / Run) ────────────────────────
     static void Step4_CreateAnimator()
     {
+        // Always recreate. The clip-name match logic has changed and any pre-existing
+        // controller from a previous Run may have null motions on its states.
         if (AssetDatabase.LoadAssetAtPath<AnimatorController>(CTRL) != null)
         {
-            Debug.Log("[SetupSuccubusPBR] Step 4: AnimatorController already exists — skipping.");
-            return;
+            AssetDatabase.DeleteAsset(CTRL);
+            Debug.Log("[SetupBakeoffA] Step 4: deleted stale controller; rebuilding.");
         }
 
         var clips = AssetDatabase.LoadAllAssetsAtPath(FBX)
@@ -241,9 +243,14 @@ public static class SetupBakeoffA
         var run  = sm.AddState("Run");
         sm.defaultState = idle;
 
+        // Blender FBX export prefixes clip names with the armature: 'Succubus_Rig|Idle'.
+        // With bake_anim_use_all_actions + bake_anim_use_nla_strips both true we also get
+        // 'Succubus_Rig|Succubus_Rig|Idle'. Match on the last segment only.
         foreach (var clip in clips)
         {
-            switch (clip.name)
+            int pipe = clip.name.LastIndexOf('|');
+            string suffix = pipe >= 0 ? clip.name.Substring(pipe + 1) : clip.name;
+            switch (suffix)
             {
                 case "Idle": idle.motion = clip; break;
                 case "Walk": walk.motion = clip; break;
