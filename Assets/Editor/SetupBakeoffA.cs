@@ -32,7 +32,7 @@ public static class SetupBakeoffA
     const string PREF_KEY    = "SetupBakeoffA_Done_v1";
 
     // ── Auto-run once ─────────────────────────────────────────────────────────
-    static SetupSuccubusPBR()
+    static SetupBakeoffA()
     {
         if (EditorPrefs.GetBool(PREF_KEY, false)) return;
         EditorApplication.delayCall += Run;
