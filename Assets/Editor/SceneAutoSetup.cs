@@ -42,8 +42,8 @@ public static class SceneAutoSetup
         ground.name = "Ground";
         ground.transform.localScale = new Vector3(10f, 1f, 10f);
 
-        // Player — prefer Succubus FBX, then Y-Bot placeholder, then plain cylinder.
-        const string succubusFbx = "Assets/Characters/Succubus/succubus.fbx";
+        // Player — prefer the bake-off Pipeline A succubus, then legacy paths, then cylinder.
+        const string succubusFbx = "Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx";
         const string succubusCtrl = "Assets/Animations/Succubus/SuccubusAnimator.controller";
         const string placeholderFbx = "Assets/Characters/Placeholder/YBot.fbx";
         const string placeholderCtrl = "Assets/Animations/Placeholder/PlaceholderAnimator.controller";
