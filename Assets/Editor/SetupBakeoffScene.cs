@@ -27,8 +27,11 @@ public static class SetupBakeoffScene
         new Slot { Id = "C", Label = "(slot C reserved)",   FbxPath = "Assets/Characters/Bakeoff/C/succubus_c.fbx",          MaterialPath = "",                                                AnimatorPath = "" },
     };
 
-    const float SLOT_SPACING = 3.0f;   // metres between slot centres
-    const float GROUND_SCALE = 20f;
+    const float SLOT_SPACING   = 3.0f;   // metres between slot centres
+    const float GROUND_SCALE   = 20f;
+    const float TARGET_HEIGHT  = 1.8f;   // each slot's character is scaled so its world-space
+                                          // bounds height = this many metres. Fair comparison
+                                          // regardless of what each AI tool's normalization is.
 
     [MenuItem("Tools/Build Bake-off Scene")]
     public static void Build()
@@ -121,6 +124,11 @@ public static class SetupBakeoffScene
             if (anim == null) anim = model.AddComponent<Animator>();
             if (ctrl != null) anim.runtimeAnimatorController = ctrl;
             anim.applyRootMotion = false;
+
+            // Normalize size so each pipeline's character renders at TARGET_HEIGHT metres,
+            // regardless of what scale the AI tool's mesh originally has. Measure the union
+            // of all SkinnedMeshRenderer bounds, compute the scale ratio, apply uniformly.
+            NormalizeHeight(model, slot.Id);
         }
         else
         {
@@ -154,6 +162,44 @@ public static class SetupBakeoffScene
 
         // Face the camera (camera is at +Z=-6.5, looking +Z toward origin)
         labelGo.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+    }
+
+    /// <summary>
+    /// Rescale the model so the world-space height of its renderer bounds equals
+    /// TARGET_HEIGHT. After scaling, push its localPosition down by the minimum-Y of the
+    /// scaled bounds so feet end at slot y=0.
+    /// </summary>
+    static void NormalizeHeight(GameObject model, string slotId)
+    {
+        var renderers = model.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+
+        // Union of renderer bounds in world space (must be after the model is parented and
+        // its initial transform applied — Unity computes bounds in world coords).
+        Bounds b = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+
+        float currentHeight = b.size.y;
+        if (currentHeight <= 0.001f)
+        {
+            Debug.LogWarning($"[SetupBakeoffScene] Slot {slotId}: degenerate bounds, skipping normalize.");
+            return;
+        }
+
+        float scale = TARGET_HEIGHT / currentHeight;
+        model.transform.localScale *= scale;
+
+        // Bounds invalidate after scale; recompute and snap feet to y=0 relative to slot root.
+        Bounds b2 = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++) b2.Encapsulate(renderers[i].bounds);
+        float feetY = b2.min.y;
+        Vector3 slotWorld = model.transform.parent != null ? model.transform.parent.position : Vector3.zero;
+        Vector3 lp = model.transform.localPosition;
+        lp.y += slotWorld.y - feetY;
+        model.transform.localPosition = lp;
+
+        Debug.Log($"[SetupBakeoffScene] Slot {slotId}: normalized to {TARGET_HEIGHT:F2}m " +
+                  $"(was {currentHeight:F2}m, scale x{scale:F3}).");
     }
 
     class Slot
