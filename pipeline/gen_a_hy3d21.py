@@ -86,10 +86,15 @@ else:
     )
     print("[A] dit-v2-1 loaded")
 
-    image = Image.open(REF_IMAGE).convert("RGBA")
-    if image.mode == "RGB":
-        rembg = BackgroundRemover()
-        image = rembg(image)
+    # Always run rembg: HY3D-2.1 needs background-removed images. The old
+    # `convert("RGBA"); if mode == "RGB"` check was dead — mode is always
+    # RGBA after convert. White-background bug = the "back plate full of
+    # holes" + holes in face/arms/legs/torso.
+    image = Image.open(REF_IMAGE)
+    print(f"[A] reference mode={image.mode} size={image.size}")
+    rembg = BackgroundRemover()
+    image = rembg(image)
+    print(f"[A] post-rembg mode={image.mode}")
 
     SHAPE_OCTREE_RES = 512
     SHAPE_INFER_STEPS = 50
