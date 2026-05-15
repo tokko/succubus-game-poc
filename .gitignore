@@ -1,0 +1,54 @@
+# Unity generated
+Library/
+Temp/
+Logs/
+UserSettings/
+obj/
+Build/
+Builds/
+
+# IDE / build artifacts
+*.csproj
+*.sln
+*.unityproj
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+.vsconfig
+
+# OS junk
+.DS_Store
+Thumbs.db
+sysinfo.txt
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+
+# Crash reports
+sysinfo.txt
+crashlytics-build.properties
+
+# Pipeline intermediate artifacts (regeneratable)
+pipeline/refs/*.png
+pipeline/*.log
+pipeline/*.err
+pipeline/*_out.txt
+pipeline/*_err.txt
+
+# Large AI character generation outputs — track via Git LFS if needed
+Assets/Characters/Succubus/*.glb
+Assets/Characters/Succubus/*.fbx
+Assets/Characters/Succubus/*.jpg
+Assets/Characters/Succubus/*.png
