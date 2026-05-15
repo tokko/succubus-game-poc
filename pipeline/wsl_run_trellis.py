@@ -15,6 +15,12 @@ from pathlib import Path
 import os
 import sys
 
+# The trellis package lives at ~/TRELLIS/trellis (not pip-installed) — put the
+# repo root on sys.path so `from trellis.pipelines import ...` works regardless
+# of cwd or where this script was launched from.
+TRELLIS_REPO = Path.home() / "TRELLIS"
+sys.path.insert(0, str(TRELLIS_REPO))
+
 # WSL sees the Windows project under /mnt/d
 PROJ = Path("/mnt/d/claude projects/succubus-game-poc")
 REF  = PROJ / "pipeline" / "refs" / "succubus_ref.png"

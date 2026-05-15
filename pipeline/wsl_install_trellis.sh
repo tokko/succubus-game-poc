@@ -31,10 +31,14 @@ conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r 
 
 # ── 2. TRELLIS repo ──────────────────────────────────────────────────────────
 if [ ! -d "$TRELLIS_DIR" ]; then
-  log "Cloning microsoft/TRELLIS"
-  git clone --depth=1 https://github.com/microsoft/TRELLIS.git "$TRELLIS_DIR" >>"$LOG" 2>&1
+  log "Cloning microsoft/TRELLIS (with submodules)"
+  # --recurse-submodules is REQUIRED — trellis/representations/mesh/flexicubes
+  # is an empty dir without it, and the pipeline import chain breaks.
+  git clone --depth=1 --recurse-submodules https://github.com/microsoft/TRELLIS.git "$TRELLIS_DIR" >>"$LOG" 2>&1
 fi
 cd "$TRELLIS_DIR"
+# Safety: re-init submodules in case the initial clone missed them
+git submodule update --init --recursive >>"$LOG" 2>&1
 
 # ── 3. setup.sh ──────────────────────────────────────────────────────────────
 # Creates conda env 'trellis' with custom CUDA extensions.
