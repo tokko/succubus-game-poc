@@ -83,13 +83,14 @@ public static class SetupBakeoffScene
             BuildSlot(Slots[i], new Vector3(x, 0f, 0f));
         }
 
-        // Camera — frames all slots
+        // Camera — InspectorCamera fly-cam, framed on all slots at start
         var camGo = new GameObject("Main Camera");
         camGo.tag = "MainCamera";
         camGo.transform.position = new Vector3(0f, 2.0f, -6.5f);
         camGo.transform.rotation = Quaternion.Euler(8f, 0f, 0f);
         camGo.AddComponent<Camera>();
         camGo.AddComponent<AudioListener>();
+        camGo.AddComponent<InspectorCamera>();
 
         // Save
         Directory.CreateDirectory(Path.GetDirectoryName(SCENE_PATH));
