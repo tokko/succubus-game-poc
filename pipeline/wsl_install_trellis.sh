@@ -21,7 +21,13 @@ if [ ! -d "$MINICONDA_DIR" ]; then
   bash miniconda.sh -b -p "$MINICONDA_DIR" >>"$LOG" 2>&1
 fi
 source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+export PATH="$MINICONDA_DIR/bin:$PATH"
 log "conda: $(conda --version)"
+
+# Accept channel TOS non-interactively (newer miniconda requires this; default-deny
+# blocks env creation with CondaToSNonInteractiveError otherwise).
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main >>"$LOG" 2>&1 || true
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r    >>"$LOG" 2>&1 || true
 
 # ── 2. TRELLIS repo ──────────────────────────────────────────────────────────
 if [ ! -d "$TRELLIS_DIR" ]; then
