@@ -42,10 +42,13 @@ if conda env list | grep -q '^trellis '; then
   log "trellis env already exists — skipping setup.sh"
 else
   log "Running TRELLIS setup.sh — this builds 4+ custom CUDA extensions, takes 20-40 min."
-  # Non-interactive: feed yes to any prompts.
-  yes | bash setup.sh --new-env --basic --xformers --flash-attn --diffoctreerast --spconv --mipgaussian --kaolin --nvdiffrast >>"$LOG" 2>&1 || {
+  # CRITICAL: must SOURCE (not execute) setup.sh. setup.sh calls `conda activate trellis`
+  # internally, which requires the `conda` shell function in scope. bash <script> launches
+  # a child shell that doesn't inherit the function, so the activate silently no-ops and
+  # torch gets installed into the wrong env. Sourcing keeps the function in scope.
+  . ./setup.sh --new-env --basic --xformers --flash-attn --diffoctreerast --spconv --mipgaussian --kaolin --nvdiffrast >>"$LOG" 2>&1 || {
     log "setup.sh FAILED — check $LOG for the failing step"
-    exit 1
+    return 1
   }
 fi
 
