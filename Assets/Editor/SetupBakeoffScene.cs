@@ -119,8 +119,14 @@ public static class SetupBakeoffScene
                     r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
             }
 
-            // Animator (always plays Idle in the bake-off scene)
-            var ctrl = string.IsNullOrEmpty(slot.AnimatorPath) ? null : AssetDatabase.LoadAssetAtPath<AnimatorController>(slot.AnimatorPath);
+            // Animator (always plays Idle in the bake-off scene). Build the controller
+            // here if it doesn't exist yet — don't rely on SetupBakeoffA/B having run
+            // first, since they're gated on EditorPrefs and may not have re-fired.
+            AnimatorController ctrl = null;
+            if (!string.IsNullOrEmpty(slot.AnimatorPath))
+            {
+                ctrl = EnsureControllerForFbx(slot.FbxPath, slot.AnimatorPath);
+            }
             var anim = model.GetComponentInChildren<Animator>();
             if (anim == null) anim = model.AddComponent<Animator>();
             if (ctrl != null) anim.runtimeAnimatorController = ctrl;
@@ -163,6 +169,72 @@ public static class SetupBakeoffScene
 
         // Face the camera (camera is at +Z=-6.5, looking +Z toward origin)
         labelGo.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+    }
+
+    /// <summary>
+    /// Build or rebuild an Idle/Walk/Run AnimatorController that pulls clips out of an
+    /// FBX. Handles Blender's "Succubus_Rig|Idle" / "Succubus_Rig|Succubus_Rig|Idle"
+    /// naming by matching the last `|`-delimited segment. Always recreates so the same
+    /// path doesn't keep an old null-motion controller around.
+    /// </summary>
+    static AnimatorController EnsureControllerForFbx(string fbxPath, string ctrlPath)
+    {
+        if (!File.Exists(Path.GetFullPath(fbxPath))) return null;
+
+        // Ensure target folder exists
+        var dir = Path.GetDirectoryName(ctrlPath);
+        if (!AssetDatabase.IsValidFolder(dir))
+            AssetDatabase.CreateFolder(Path.GetDirectoryName(dir), Path.GetFileName(dir));
+
+        // Recreate so clip-name fix from earlier always propagates
+        if (AssetDatabase.LoadAssetAtPath<AnimatorController>(ctrlPath) != null)
+            AssetDatabase.DeleteAsset(ctrlPath);
+
+        var clips = AssetDatabase.LoadAllAssetsAtPath(fbxPath)
+            .OfType<AnimationClip>()
+            .Where(c => !c.name.StartsWith("__"))
+            .ToArray();
+        if (clips.Length == 0)
+        {
+            Debug.LogWarning($"[SetupBakeoffScene] No animation clips found in {fbxPath} — Animator will T-pose.");
+            return null;
+        }
+
+        var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
+        ctrl.AddParameter("speed", AnimatorControllerParameterType.Float);
+        var sm = ctrl.layers[0].stateMachine;
+        var idle = sm.AddState("Idle");
+        var walk = sm.AddState("Walk");
+        var run  = sm.AddState("Run");
+        sm.defaultState = idle;
+
+        foreach (var c in clips)
+        {
+            int pipe = c.name.LastIndexOf('|');
+            string suf = pipe >= 0 ? c.name.Substring(pipe + 1) : c.name;
+            switch (suf)
+            {
+                case "Idle": idle.motion = c; break;
+                case "Walk": walk.motion = c; break;
+                case "Run":  run.motion  = c; break;
+            }
+        }
+
+        void AddTrans(AnimatorState from, AnimatorState to, AnimatorConditionMode mode, float th)
+        {
+            var t = from.AddTransition(to);
+            t.AddCondition(mode, th, "speed");
+            t.duration = (from == idle || to == idle) ? 0.25f : 0.1f;
+            t.hasExitTime = false;
+        }
+        AddTrans(idle, walk, AnimatorConditionMode.Greater, 0.1f);
+        AddTrans(walk, idle, AnimatorConditionMode.Less,    0.1f);
+        AddTrans(walk, run,  AnimatorConditionMode.Greater, 4.5f);
+        AddTrans(run,  walk, AnimatorConditionMode.Less,    4.5f);
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SetupBakeoffScene] Built controller {ctrlPath} from {clips.Length} clips ({string.Join(",", clips.Select(c => c.name))}).");
+        return ctrl;
     }
 
     /// <summary>

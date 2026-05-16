@@ -1,125 +1,169 @@
 using UnityEngine;
 
 /// <summary>
-/// Free-fly inspection camera for the bake-off scene.
-///   WASD       : forward / back / strafe (camera-relative, horizontal plane)
-///   Q / E      : down / up
-///   RMB / MMB drag : pitch + yaw look
-///   Scroll     : adjust move speed (held value)
-///   Shift      : 4x speed boost while held
-///   1 / 2 / 3  : warp camera to inspect Slot_A / Slot_B / Slot_C (if present in scene)
+/// Orbital inspection camera for the bake-off scene.
+///   MMB or RMB drag : orbit yaw + pitch around the focus point
+///   Scroll          : zoom (distance to focus, clamped minDistance..maxDistance)
+///   WASD            : pan focus point (camera-relative horizontal)
+///   Q / E           : pan focus point down / up
+///   Shift           : 4x pan speed
+///   1 / 2 / 3       : snap focus to Slot A / B / C, auto-fit distance to slot bounds
+///   F               : re-frame current focus (auto-distance)
 ///
-/// Sits on Main Camera. No physics, no target — just transform manipulation.
+/// Designed to live on Main Camera. No physics. Auto-resolves Slot_A/B/C transforms
+/// by name on Awake so the user can drop this into a scene without wiring.
 /// </summary>
 public class InspectorCamera : MonoBehaviour
 {
-    [Header("Movement")]
-    public float baseSpeed = 3.0f;
-    public float speedMin  = 0.3f;
-    public float speedMax  = 30f;
-    public float boostMul  = 4f;
+    [Header("Orbit target")]
+    public Vector3 focus = new Vector3(0f, 1.0f, 0f);
+    public float distance = 4f;
+    public float yaw = 0f;
+    public float pitch = 10f;
 
-    [Header("Look")]
+    [Header("Limits")]
+    public float minDistance = 0.4f;
+    public float maxDistance = 15f;
+    public float minPitch = -85f;
+    public float maxPitch =  85f;
+
+    [Header("Sensitivities")]
     public float lookSensitivity = 0.25f;
-    public float pitchMin = -85f;
-    public float pitchMax =  85f;
+    public float zoomFactor = 0.15f;       // scroll multiplier (fraction of current distance per tick)
+    public float panSpeed = 2.5f;
+    public float boostMul = 4f;
+
+    [Header("Auto-fit on slot snap")]
+    public float fitFovMargin = 1.25f;     // distance = bounds.height / 2 / tan(fov/2) * margin
 
     [Header("Slot warp targets (auto-resolved if names match)")]
     public Transform slotA;
     public Transform slotB;
     public Transform slotC;
-    public Vector3   warpOffset = new Vector3(0f, 1.4f, -2.3f);
 
-    float _yaw;
-    float _pitch;
     Vector3 _lastMouse;
-    bool _looking;
+    bool _dragging;
+    Camera _cam;
 
     void Awake()
     {
-        var e = transform.rotation.eulerAngles;
-        _yaw = e.y;
-        _pitch = NormalizePitch(e.x);
-
+        _cam = GetComponent<Camera>();
         if (slotA == null) slotA = GameObject.Find("Slot_A")?.transform;
         if (slotB == null) slotB = GameObject.Find("Slot_B")?.transform;
         if (slotC == null) slotC = GameObject.Find("Slot_C")?.transform;
     }
 
-    void Update()
+    void Start()
     {
-        HandleLook();
-        HandleMove();
-        HandleSpeedScroll();
-        HandleWarp();
+        // Initial framing on Slot_A if it exists, else use the inspector defaults.
+        if (slotA != null) WarpAndFit(slotA);
+        ApplyTransform();
     }
 
-    void HandleLook()
+    void Update()
+    {
+        HandleOrbit();
+        HandleZoom();
+        HandlePan();
+        HandleSnap();
+        ApplyTransform();
+    }
+
+    void HandleOrbit()
     {
         if (Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
         {
-            _looking = true;
+            _dragging = true;
             _lastMouse = Input.mousePosition;
         }
-        if (Input.GetMouseButtonUp(1) && !Input.GetMouseButton(2)) _looking = false;
-        if (Input.GetMouseButtonUp(2) && !Input.GetMouseButton(1)) _looking = false;
+        if (!Input.GetMouseButton(1) && !Input.GetMouseButton(2)) _dragging = false;
 
-        if (_looking && (Input.GetMouseButton(1) || Input.GetMouseButton(2)))
+        if (_dragging)
         {
             Vector3 d = Input.mousePosition - _lastMouse;
-            _yaw   += d.x * lookSensitivity;
-            _pitch -= d.y * lookSensitivity;
-            _pitch  = Mathf.Clamp(_pitch, pitchMin, pitchMax);
+            yaw   += d.x * lookSensitivity;
+            pitch -= d.y * lookSensitivity;
+            pitch  = Mathf.Clamp(pitch, minPitch, maxPitch);
             _lastMouse = Input.mousePosition;
-            transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
         }
     }
 
-    void HandleMove()
-    {
-        float h = Input.GetAxisRaw("Horizontal");        // A/D
-        float v = Input.GetAxisRaw("Vertical");          // W/S
-        float u = (Input.GetKey(KeyCode.E) ? 1f : 0f)    // E up
-               - (Input.GetKey(KeyCode.Q) ? 1f : 0f);    // Q down
-
-        if (Mathf.Approximately(h, 0f) && Mathf.Approximately(v, 0f) && Mathf.Approximately(u, 0f)) return;
-
-        Vector3 fwd = transform.forward; fwd.y = 0f; fwd.Normalize();
-        Vector3 rgt = transform.right;   rgt.y = 0f; rgt.Normalize();
-
-        Vector3 dir = fwd * v + rgt * h + Vector3.up * u;
-        float speed = baseSpeed * (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? boostMul : 1f);
-        transform.position += dir.normalized * speed * Time.deltaTime;
-    }
-
-    void HandleSpeedScroll()
+    void HandleZoom()
     {
         float s = Input.GetAxis("Mouse ScrollWheel");
         if (Mathf.Approximately(s, 0f)) return;
-        baseSpeed = Mathf.Clamp(baseSpeed * (1f + s * 1.5f), speedMin, speedMax);
+        // Multiplicative zoom — feels natural at both ends of the range.
+        distance = Mathf.Clamp(distance * (1f - s * zoomFactor * 10f), minDistance, maxDistance);
     }
 
-    void HandleWarp()
+    void HandlePan()
     {
-        if (Input.GetKeyDown(KeyCode.Alpha1) && slotA != null) WarpTo(slotA);
-        if (Input.GetKeyDown(KeyCode.Alpha2) && slotB != null) WarpTo(slotB);
-        if (Input.GetKeyDown(KeyCode.Alpha3) && slotC != null) WarpTo(slotC);
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        float u = (Input.GetKey(KeyCode.E) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f);
+        if (Mathf.Approximately(h, 0f) && Mathf.Approximately(v, 0f) && Mathf.Approximately(u, 0f)) return;
+
+        Quaternion rot = Quaternion.Euler(0f, yaw, 0f);   // pan in camera-yaw-only plane
+        Vector3 fwd = rot * Vector3.forward;
+        Vector3 rgt = rot * Vector3.right;
+        Vector3 dir = (fwd * v + rgt * h + Vector3.up * u).normalized;
+
+        float speed = panSpeed * (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? boostMul : 1f);
+        // Pan speed scales with distance so far zoom feels equally responsive.
+        focus += dir * speed * distance * 0.25f * Time.deltaTime;
     }
 
-    void WarpTo(Transform t)
+    void HandleSnap()
     {
-        transform.position = t.position + warpOffset;
-        Vector3 lookAt = t.position + Vector3.up * 1.0f;
-        Vector3 dir = (lookAt - transform.position).normalized;
-        _pitch = -Mathf.Asin(dir.y) * Mathf.Rad2Deg;
-        _yaw   =  Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-        _pitch = Mathf.Clamp(_pitch, pitchMin, pitchMax);
-        transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+        if (Input.GetKeyDown(KeyCode.Alpha1) && slotA != null) WarpAndFit(slotA);
+        if (Input.GetKeyDown(KeyCode.Alpha2) && slotB != null) WarpAndFit(slotB);
+        if (Input.GetKeyDown(KeyCode.Alpha3) && slotC != null) WarpAndFit(slotC);
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            // Re-fit on whatever the focus is closest to
+            Transform best = null;
+            float bestDist = float.MaxValue;
+            foreach (var t in new[] { slotA, slotB, slotC })
+            {
+                if (t == null) continue;
+                float d = Vector3.Distance(t.position, focus);
+                if (d < bestDist) { best = t; bestDist = d; }
+            }
+            if (best != null) WarpAndFit(best);
+        }
     }
 
-    static float NormalizePitch(float x)
+    void WarpAndFit(Transform slot)
     {
-        if (x > 180f) x -= 360f;
-        return Mathf.Clamp(x, -180f, 180f);
+        // Compute renderer bounds of the slot's children, set focus to their centre,
+        // set distance to fit the bounds vertically in the camera FOV.
+        var renderers = slot.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            focus = slot.position + Vector3.up * 1.0f;
+            distance = 4f;
+        }
+        else
+        {
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) b.Encapsulate(renderers[i].bounds);
+            focus = b.center;
+            float fov = _cam != null ? _cam.fieldOfView : 60f;
+            float halfFovRad = fov * 0.5f * Mathf.Deg2Rad;
+            float requiredForHeight = b.extents.y / Mathf.Tan(halfFovRad);
+            float requiredForWidth  = b.extents.x / Mathf.Tan(halfFovRad) * (Screen.height / (float)Mathf.Max(1, Screen.width));
+            distance = Mathf.Clamp(Mathf.Max(requiredForHeight, requiredForWidth) * fitFovMargin, minDistance, maxDistance);
+        }
+        // Default a slight downward yaw so we view from front-three-quarter
+        yaw = 0f;
+        pitch = 10f;
+    }
+
+    void ApplyTransform()
+    {
+        Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 pos = focus + rot * new Vector3(0f, 0f, -distance);
+        transform.position = pos;
+        transform.LookAt(focus);
     }
 }
