@@ -22,9 +22,9 @@ public static class SetupBakeoffB
     // ── Paths ─────────────────────────────────────────────────────────────────
     const string BASE        = "Assets/Characters/Bakeoff/B_TRELLIS";
     const string FBX         = BASE + "/succubus_b.fbx";
-    const string ALBEDO      = BASE + "/succubus_albedo.jpg";   // may not exist; TRELLIS embeds texture in GLB
-    const string METALLIC    = BASE + "/succubus_metallic.jpg"; // optional
-    const string ROUGHNESS   = BASE + "/succubus_roughness.jpg";
+    const string ALBEDO      = BASE + "/succubus_b_albedo.jpg";   // extracted from succubus_b.glb baseColorTexture
+    const string METALLIC    = BASE + "/succubus_b_metallic.jpg"; // TRELLIS doesn't produce these; skipped
+    const string ROUGHNESS   = BASE + "/succubus_b_roughness.jpg";
     const string PACKED      = BASE + "/succubus_metalSmooth.png";
     const string MAT         = BASE + "/SuccubusB.mat";
     const string CTRL        = "Assets/Animations/Bakeoff/SuccubusB.controller";
