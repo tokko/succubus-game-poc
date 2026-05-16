@@ -113,8 +113,14 @@ public static class SetupBakeoffScene
             model.name = $"Model_{slot.Id}";
             model.transform.localPosition = Vector3.zero;
 
-            // Material
-            var mat = string.IsNullOrEmpty(slot.MaterialPath) ? null : AssetDatabase.LoadAssetAtPath<Material>(slot.MaterialPath);
+            // Material — create from PBR sidecars if not yet present so scene rebuilds
+            // don't depend on SetupBakeoffA/B/C.ForceRun having fired.
+            Material mat = null;
+            if (!string.IsNullOrEmpty(slot.MaterialPath))
+            {
+                mat = AssetDatabase.LoadAssetAtPath<Material>(slot.MaterialPath);
+                if (mat == null) mat = EnsureMaterialForSlot(slot);
+            }
             if (mat != null)
             {
                 foreach (var r in model.GetComponentsInChildren<Renderer>())
@@ -171,6 +177,46 @@ public static class SetupBakeoffScene
 
         // Face the camera (camera is at +Z=-6.5, looking +Z toward origin)
         labelGo.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+    }
+
+    /// <summary>
+    /// Create a URP Lit material with the slot's albedo. Conventional sidecar paths:
+    ///   {slot dir}/succubus_pbr.jpg      (A, C from HY3D paint pipeline)
+    ///   {slot dir}/succubus_b_albedo.jpg (B from TRELLIS GLB extract)
+    /// Falls back to whichever exists. Matte non-metallic surface — HY3D's metallic map
+    /// is uniform grey across skin and produces a wet/metallic look in URP if used.
+    /// </summary>
+    static Material EnsureMaterialForSlot(Slot slot)
+    {
+        var litShader = Shader.Find("Universal Render Pipeline/Lit");
+        if (litShader == null) { Debug.LogError("[SetupBakeoffScene] URP Lit shader missing"); return null; }
+
+        string dir = Path.GetDirectoryName(slot.FbxPath).Replace('\\', '/');
+        string[] candidates = {
+            $"{dir}/succubus_pbr.jpg",
+            $"{dir}/succubus_b_albedo.jpg",
+            $"{dir}/succubus_albedo.jpg",
+        };
+        Texture2D albedo = null;
+        foreach (var p in candidates)
+        {
+            albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(p);
+            if (albedo != null) break;
+        }
+
+        var mat = new Material(litShader);
+        if (albedo != null) mat.SetTexture("_BaseMap", albedo);
+        mat.SetFloat("_Metallic", 0f);
+        mat.SetFloat("_Smoothness", 0.35f);
+        mat.doubleSidedGI = true;
+        mat.SetFloat("_Cull", 0f);
+
+        var matDir = Path.GetDirectoryName(slot.MaterialPath);
+        if (!AssetDatabase.IsValidFolder(matDir))
+            AssetDatabase.CreateFolder(Path.GetDirectoryName(matDir), Path.GetFileName(matDir));
+        AssetDatabase.CreateAsset(mat, slot.MaterialPath);
+        Debug.Log($"[SetupBakeoffScene] Created {slot.MaterialPath} (albedo: {(albedo != null ? albedo.name : "none")})");
+        return mat;
     }
 
     /// <summary>

@@ -6,19 +6,29 @@ Comparison of two text-prompt-to-rigged-FBX pipelines on the same source
 image (`pipeline/refs/succubus_ref.png`, 1024×1024, SD Forge `ilustmix_v111`,
 seed 20260515, DDIM 40 steps, T-pose succubus reference).
 
-## Quick verdict
+## Quick verdict (3 pipelines shipped)
 
-| Pipeline | Cleanliness | Setup pain | Re-runnable | Verdict |
+| Pipeline | Verts | Texture | Setup pain | Verdict |
 |---|---|---|---|---|
-| A: Hunyuan3D-2.1 (local Windows) | sausagy 90s-look, 50k verts | medium (gen-4 patches) | yes | works, ceiling-bound |
-| B: TRELLIS-image-large (WSL Linux) | cleaner, 4.7k verts (10× simpler) | high (one-time, 5 cascading bugs) | yes | clear winner on topology |
+| **A**: Hunyuan3D-2.1 (single view, local Windows) | 50,711 | clean PBR atlas | medium (gen-4 patches) | works, sausagy mesh |
+| **B**: TRELLIS-image-large (WSL Linux) | **4,749** | UV atlas extract — texture wraps oddly | high (7 cascading bugs) | best topology, worst texture mapping |
+| **C**: Hunyuan3D-2mv (4-view, local Windows) | 50,486 | clean PBR atlas | medium (reused A's stack) | possibly best overall; multi-view input visibly helps |
 
-Both still need rigging via Blender Rigify + envelope weighting (same script
-`rig_*.py`). Both use Unity Generic rig (Rigify DEF-bones don't map to
-Mecanim Humanoid muscle definitions).
+**Pipeline D (TRELLIS.2-4B) killed:** Microsoft's `pipeline.json` references a
+private internal `ckpts/ss_flow_img_dit_1_3B_64_bf16` repo (401). Release oversight.
 
-Pipeline C (originally TRELLIS.2, Hunyuan3D-Omni, or Rodin) deferred — see
-"Open questions" at bottom.
+**Pipeline F (Wonder3D) skipped:** 2023-era torch 1.13.1+cu117 / xformers 0.0.16 /
+diffusers 0.19.3 pins don't have current PyPI wheels. Modernization fork would be
+3-6 hr with unfixable model-weight-signature risk. TRELLIS supersedes most of
+Wonder3D's claims anyway.
+
+**Pipeline E (MB-Lab / MakeHuman):** abandoned. MB-Lab is unmaintained; MakeHuman's
+headless API is barely documented; the "LLM-as-3D-modeler" angle has a low quality
+ceiling without parametric base meshes that don't exist for Blender 4.2.
+
+All three shipped pipelines need rigging via Blender Rigify + envelope weighting
+(same `rig_*.py` script). All use Unity Generic rig + CreateFromThisModel avatar
+(Rigify DEF-bones don't map to Mecanim Humanoid muscles).
 
 ## Side-by-side specs
 
