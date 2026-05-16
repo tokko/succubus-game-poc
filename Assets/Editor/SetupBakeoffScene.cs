@@ -24,8 +24,9 @@ public static class SetupBakeoffScene
     // than useful.
     static readonly Slot[] Slots = new[]
     {
-        new Slot { Id = "A", Label = "HY3D-2.1\n(local)",   FbxPath = "Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx", MaterialPath = "Assets/Characters/Bakeoff/A_HY3D21/SuccubusA.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusA.controller" },
-        new Slot { Id = "B", Label = "TRELLIS\n(WSL)",      FbxPath = "Assets/Characters/Bakeoff/B_TRELLIS/succubus_b.fbx", MaterialPath = "Assets/Characters/Bakeoff/B_TRELLIS/SuccubusB.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusB.controller" },
+        new Slot { Id = "A", Label = "HY3D-2.1\n(single view)", FbxPath = "Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx", MaterialPath = "Assets/Characters/Bakeoff/A_HY3D21/SuccubusA.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusA.controller" },
+        new Slot { Id = "B", Label = "TRELLIS\n(WSL)",          FbxPath = "Assets/Characters/Bakeoff/B_TRELLIS/succubus_b.fbx", MaterialPath = "Assets/Characters/Bakeoff/B_TRELLIS/SuccubusB.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusB.controller" },
+        new Slot { Id = "C", Label = "HY3D-2mv\n(4 views)",     FbxPath = "Assets/Characters/Bakeoff/C_HY3DMV/succubus_c.fbx", MaterialPath = "Assets/Characters/Bakeoff/C_HY3DMV/SuccubusC.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusC.controller" },
     };
 
     const float SLOT_SPACING   = 3.0f;   // metres between slot centres
