@@ -19,12 +19,13 @@ public static class SetupBakeoffScene
 {
     const string SCENE_PATH = "Assets/Scenes/Bakeoff.unity";
 
-    // Slot definitions in display order, left-to-right.
+    // Slot definitions in display order, left-to-right. Add a third entry when
+    // Pipeline C lands — keeping the empty placeholder around is more confusing
+    // than useful.
     static readonly Slot[] Slots = new[]
     {
-        new Slot { Id = "A", Label = "HY3D-2.1\n(local)",   FbxPath = "Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx",  MaterialPath = "Assets/Characters/Bakeoff/A_HY3D21/SuccubusA.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusA.controller" },
-        new Slot { Id = "B", Label = "TRELLIS.2\n(WSL/HF)", FbxPath = "Assets/Characters/Bakeoff/B_TRELLIS/succubus_b.fbx",  MaterialPath = "Assets/Characters/Bakeoff/B_TRELLIS/SuccubusB.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusB.controller" },
-        new Slot { Id = "C", Label = "(slot C reserved)",   FbxPath = "Assets/Characters/Bakeoff/C/succubus_c.fbx",          MaterialPath = "",                                                AnimatorPath = "" },
+        new Slot { Id = "A", Label = "HY3D-2.1\n(local)",   FbxPath = "Assets/Characters/Bakeoff/A_HY3D21/succubus_a.fbx", MaterialPath = "Assets/Characters/Bakeoff/A_HY3D21/SuccubusA.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusA.controller" },
+        new Slot { Id = "B", Label = "TRELLIS\n(WSL)",      FbxPath = "Assets/Characters/Bakeoff/B_TRELLIS/succubus_b.fbx", MaterialPath = "Assets/Characters/Bakeoff/B_TRELLIS/SuccubusB.mat", AnimatorPath = "Assets/Animations/Bakeoff/SuccubusB.controller" },
     };
 
     const float SLOT_SPACING   = 3.0f;   // metres between slot centres
@@ -172,6 +173,39 @@ public static class SetupBakeoffScene
     }
 
     /// <summary>
+    /// Force the FBX to import as Generic + CreateFromThisModel avatar. Without an
+    /// avatar, the AnimationClips' bone curves can't bind to the SkinnedMeshRenderer's
+    /// skeleton at runtime, and the model T-poses. SetupBakeoffA/B Step 1 originally
+    /// set NoAvatar — that's wrong; fixed here at scene-build time.
+    /// </summary>
+    static void EnsureGenericAvatar(string fbxPath)
+    {
+        var imp = AssetImporter.GetAtPath(fbxPath) as ModelImporter;
+        if (imp == null) return;
+        bool dirty = false;
+        if (imp.animationType != ModelImporterAnimationType.Generic)
+        {
+            imp.animationType = ModelImporterAnimationType.Generic;
+            dirty = true;
+        }
+        if (imp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel)
+        {
+            imp.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            dirty = true;
+        }
+        if (imp.importAnimation != true)
+        {
+            imp.importAnimation = true;
+            dirty = true;
+        }
+        if (dirty)
+        {
+            imp.SaveAndReimport();
+            Debug.Log($"[SetupBakeoffScene] {fbxPath}: reimported as Generic + CreateFromThisModel.");
+        }
+    }
+
+    /// <summary>
     /// Build or rebuild an Idle/Walk/Run AnimatorController that pulls clips out of an
     /// FBX. Handles Blender's "Succubus_Rig|Idle" / "Succubus_Rig|Succubus_Rig|Idle"
     /// naming by matching the last `|`-delimited segment. Always recreates so the same
@@ -180,6 +214,7 @@ public static class SetupBakeoffScene
     static AnimatorController EnsureControllerForFbx(string fbxPath, string ctrlPath)
     {
         if (!File.Exists(Path.GetFullPath(fbxPath))) return null;
+        EnsureGenericAvatar(fbxPath);
 
         // Ensure target folder exists
         var dir = Path.GetDirectoryName(ctrlPath);
